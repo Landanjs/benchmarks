@@ -19,6 +19,7 @@ from composer.utils import dist
 from data import build_imagenet_dataspec
 from model import build_composer_resnet
 from omegaconf import DictConfig, OmegaConf
+import shampoo
 
 
 def build_logger(name: str, kwargs: Dict):
@@ -110,10 +111,11 @@ def main(config):
 
     # Optimizer
     print('Building optimizer and learning rate scheduler')
-    optimizer = DecoupledSGDW(composer_model.parameters(),
-                              lr=config.optimizer.lr,
-                              momentum=config.optimizer.momentum,
-                              weight_decay=config.optimizer.weight_decay)
+    # optimizer = DecoupledSGDW(composer_model.parameters(),
+    #                           lr=config.optimizer.lr,
+    #                           momentum=config.optimizer.momentum,
+    #                           weight_decay=config.optimizer.weight_decay)
+    optimizer = shampoo.Shampoo(composer_model.parameters())
 
     # Learning rate scheduler: LR warmup for 8 epochs, then cosine decay for the rest of training
     lr_scheduler = CosineAnnealingWithWarmupScheduler(
