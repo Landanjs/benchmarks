@@ -115,7 +115,7 @@ def main(config):
     #                           lr=config.optimizer.lr,
     #                           momentum=config.optimizer.momentum,
     #                           weight_decay=config.optimizer.weight_decay)
-    optimizer = shampoo.Shampoo(composer_model.parameters())
+    optimizer = shampoo.Shampoo(composer_model.parameters(), lr=config.optimizer.lr)
 
     # Learning rate scheduler: LR warmup for 8 epochs, then cosine decay for the rest of training
     lr_scheduler = CosineAnnealingWithWarmupScheduler(
