@@ -26,9 +26,10 @@ from denoising_diffusion_pytorch import Unet
 from composer import ComposerModel
 from torchmetrics import MeanSquaredError, Metric, MetricCollection
 
-class ForwardProcess():
+class ForwardProcess(nn.Module):
 
     def __init__(self, T = 1000):
+        super().__init__()
         self.betas = torch.linspace(1e-4, 2e-2, T)
 
         # Calculate cumulative products for alphas
@@ -37,7 +38,7 @@ class ForwardProcess():
         self.sqrt_alphas_cumprod = torch.sqrt(alphas_cumprod)
         self.sqrt_one_minus_alphas_cumprod = torch.sqrt(1. - alphas_cumprod)
 
-    def __call__(self, imgs, time_steps):
+    def forward(self, imgs, time_steps):
         # Normalize image between -1 and 1
         imgs = imgs * 2 - 1
 
