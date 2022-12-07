@@ -26,17 +26,19 @@ from denoising_diffusion_pytorch import Unet
 from composer import ComposerModel
 from torchmetrics import MeanSquaredError, Metric, MetricCollection
 
-class ForwardProcess(nn.Module):
+class Diffusion(nn.Module):
 
     def __init__(self, T = 1000):
         super().__init__()
         self.register_buffer('betas', torch.linspace(1e-4, 2e-2, T))
         self.register_buffer('alphas', 1 - self.betas)
+        self.register_buffer('inv_sqrt_alphas', 1 / torch.sqrt(self.alphas))
         self.register_buffer('alphas_cumprod', torch.cumprod(self.alphas, dim=0))
+        self.register_buffer('alphas_cumprod_prev', F.pad(self.alphas_cumprod[:-1], (1, 0), value=1.0))
         self.register_buffer('sqrt_alphas_cumprod', torch.sqrt(self.alphas_cumprod))
         self.register_buffer('sqrt_one_minus_alphas_cumprod', torch.sqrt(1. - self.alphas_cumprod))
 
-    def forward(self, imgs, time_steps):
+    def forward_process(self, imgs, time_steps):
         # Normalize image between -1 and 1
         imgs = imgs * 2 - 1
 
@@ -49,13 +51,27 @@ class ForwardProcess(nn.Module):
 
         return img_scaled + noise_scaled, noise
 
+    def reverse_process(self, imgs, model_out, time_steps):
+        time_steps = time_steps - 1
+        # Model component
+        model_out_scalar = (self.betas[time_steps] / self.sqrt_one_minus_alphas_cumprod[time_steps])
+        out_scaled = self.inv_sqrt_alphas[time_steps] * (imgs - model_out_scalar * model_out)
+
+        # Noise component
+        noise = torch.randn_like(model_out)
+        noise_scalar = ((1 - self.alphas_cumprod_prev[time_steps]) / (1 - self.alphas_cumprod[time_steps]))
+        noise_scaled = noise_scalar * self.betas[time_steps] * noise
+
+        img_preds = out_scaled + noise_scaled
+        return img_preds
+
 class ComposerDDPMUnet(ComposerModel):
 
     def __init__(self, dim, T = 1000):
         super().__init__()
         self.T = T
 
-        self.forward_process = ForwardProcess(self.T)
+        self.diffusion = Diffusion(self.T)
         self.model = Unet(dim=dim, dim_mults=(1, 2, 4, 8))
 
         # Metrics for training
@@ -70,7 +86,7 @@ class ComposerDDPMUnet(ComposerModel):
         time_steps = torch.randint(1, self.T, (imgs.shape[0],), device=imgs.device)
 
         # Add noise to samples based on the time steps
-        noisey_imgs, noise = self.forward_process(imgs, time_steps)
+        noisey_imgs, noise = self.diffusion.forward_process(imgs, time_steps)
         model_out = self.model(noisey_imgs, time_steps)
         return model_out, noise
 
@@ -97,6 +113,23 @@ class ComposerDDPMUnet(ComposerModel):
                 metrics_dict[name] = metric
 
         return metrics_dict
+
+
+    def loop_p_sample(self):
+        with torch.no_grad():
+            device = (next(self.model.parameters()).device)
+            imgs = torch.randn((64, 3, 32, 32), device=device)
+
+            for t in tqdm(range(self.T, 0, -1), total=self.T):
+                time_steps = torch.tensor(t, device=device, dtype=torch.long).expand(64,)
+                model_out = self.model(imgs, time_steps)
+                time_steps = time_steps.view(-1, 1, 1, 1)
+                imgs = self.diffusion.reverse_process(imgs, model_out, time_steps)
+            # Convert image range from [-1, 1] to [0, 1]
+            imgs = (imgs + 1) * 0.5
+        return imgs
+
+
 
     def update_metric(self, batch, outputs, metric):
         metric.update(outputs[0], outputs[1])

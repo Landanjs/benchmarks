@@ -15,7 +15,7 @@ from composer.utils import dist
 from data import build_cifar10_dataspec
 from model import ComposerDDPMUnet
 from omegaconf import DictConfig, OmegaConf
-
+from utils import LogDiffusionImages
 
 def build_logger(name: str, kwargs: Dict):
     if name == 'progress_bar':
@@ -89,7 +89,7 @@ def main(config):
     print('Built evaluation dataloader\n')
 
     print('Build Composer model')
-    model = ComposerDDPMUnet(dim=64, T = 1000)
+    model = ComposerDDPMUnet(dim=64, T=1000)
     print('Built Composer model\n')
 
     print('Building optimizer and learning rate scheduler')
@@ -107,6 +107,7 @@ def main(config):
     )  # Measures throughput as samples/sec and tracks total training time
     lr_monitor = LRMonitor()  # Logs the learning rate
     memory_monitor = MemoryMonitor()  # Logs memory utilization
+    log_diffusion_images = LogDiffusionImages(interval='1000ba')
     print('Built Speed, LR, and Memory monitoring callbacks\n')
 
     print('Building algorithm recipes')
@@ -134,7 +135,7 @@ def main(config):
         algorithms=algorithms,
         loggers=loggers,
         max_duration=config.max_duration,
-        callbacks=[speed_monitor, lr_monitor, memory_monitor],
+        callbacks=[speed_monitor, lr_monitor, memory_monitor, log_diffusion_images],
         save_folder=config.save_folder,
         save_interval=config.save_interval,
         save_num_checkpoints_to_keep=config.save_num_checkpoints_to_keep,
