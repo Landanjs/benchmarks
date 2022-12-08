@@ -58,9 +58,9 @@ class Diffusion(nn.Module):
         out_scaled = self.inv_sqrt_alphas[time_steps] * (imgs - model_out_scalar * model_out)
 
         # Noise component
-        noise = torch.randn_like(model_out)
+        noise = torch.randn_like(model_out) if time_steps[0] > 0 else 0
         noise_scalar = ((1 - self.alphas_cumprod_prev[time_steps]) / (1 - self.alphas_cumprod[time_steps]))
-        noise_scaled = noise_scalar * self.betas[time_steps] * noise
+        noise_scaled = torch.sqrt(noise_scalar * self.betas[time_steps]) * noise
 
         img_preds = out_scaled + noise_scaled
         return img_preds
