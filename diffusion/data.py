@@ -123,7 +123,6 @@ def build_cifar10_dataspec(
     split = 'train' if is_train else 'test'
     if is_train:
         transform = transforms.Compose([
-            transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
         ])
     else:
