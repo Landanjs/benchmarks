@@ -16,7 +16,8 @@ from composer.callbacks import LRMonitor, MemoryMonitor, SpeedMonitor
 from composer.loggers import ProgressBarLogger, WandBLogger
 from composer.optim import CosineAnnealingWithWarmupScheduler, DecoupledSGDW
 from composer.utils import dist
-from data import build_imagenet_dataspec
+#from data import build_imagenet_dataspec
+from composer.datasets.imagenet import build_streaming_imagenet1k_dataloader
 from model import build_composer_resnet
 from omegaconf import DictConfig, OmegaConf
 
@@ -68,12 +69,11 @@ def main(config):
 
     # Train dataset
     print('Building train dataloader')
-    train_dataspec = build_imagenet_dataspec(
-        data_path=config.train_dataset.path,
-        is_streaming=config.train_dataset.is_streaming,
-        batch_size=train_batch_size,
+    train_dataspec = build_streaming_imagenet1k_dataloader(
+        remote=config.train_dataset.path,
+        global_batch_size=config.train_dataset.batch_size,
         local=config.train_dataset.local,
-        is_train=True,
+        split='train',
         drop_last=True,
         shuffle=True,
         resize_size=config.train_dataset.resize_size,
@@ -86,12 +86,11 @@ def main(config):
 
     # Validation dataset
     print('Building evaluation dataloader')
-    eval_dataspec = build_imagenet_dataspec(
-        data_path=config.eval_dataset.path,
-        is_streaming=config.train_dataset.is_streaming,
-        batch_size=eval_batch_size,
+    eval_dataspec = build_streaming_imagenet1k_dataloader(
+        remote=config.eval_dataset.path,
+        global_batch_size=config.eval_dataset.batch_size,
         local=config.eval_dataset.local,
-        is_train=False,
+        split='val',
         drop_last=False,
         shuffle=False,
         resize_size=config.eval_dataset.resize_size,
